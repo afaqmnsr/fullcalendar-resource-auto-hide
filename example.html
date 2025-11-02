@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Example: Resource Auto-Hide Plugin</title>
+  <link href='https://cdn.jsdelivr.net/npm/fullcalendar-scheduler@6.1.9/index.global.min.css' rel='stylesheet' />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    .controls {
+      margin: 20px 0;
+      padding: 15px;
+      background: #f9f9f9;
+      border-radius: 5px;
+      border: 1px solid #ddd;
+    }
+    .controls label {
+      display: inline-block;
+      margin-right: 20px;
+      margin-bottom: 10px;
+    }
+    .controls input, .controls select {
+      margin-left: 5px;
+      padding: 5px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+    }
+    .status {
+      margin: 10px 0;
+      padding: 10px;
+      background: #e8f5e9;
+      border-left: 4px solid #4caf50;
+      border-radius: 3px;
+    }
+    #calendar {
+      margin-top: 20px;
+    }
+    .test-info {
+      margin: 15px 0;
+      padding: 10px;
+      background: #fff3cd;
+      border-left: 4px solid #ffc107;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Resource Auto-Hide Plugin Example</h1>
+    
+    <div class="test-info">
+      <strong>Test Scenarios:</strong>
+      <ul style="margin: 5px 0; padding-left: 20px;">
+        <li><strong>View Changes:</strong> Switch between Day, Week, Month, and Year views to test auto-hide across different time scales</li>
+        <li><strong>Date Navigation:</strong> Navigate to dates with/without events to see resources hide/show dynamically</li>
+        <li><strong>Background Events:</strong> Test the "Include Background Events" option - resources 32-40 have ONLY background events</li>
+        <li><strong>Edge Cases:</strong> Test buffer days, always-visible resources, multiple events, and event changes</li>
+        <li><strong>Time Periods:</strong> Events are spread across weeks, months, and years for comprehensive testing</li>
+      </ul>
+    </div>
+
+    <div class="controls">
+      <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #ddd;">
+        <strong style="display: block; margin-bottom: 8px;">View Type:</strong>
+        <label style="margin-right: 15px;">
+          <input type="radio" name="viewType" value="resourceTimelineDay"> Day
+        </label>
+        <label style="margin-right: 15px;">
+          <input type="radio" name="viewType" value="resourceTimelineWeek"> Week
+        </label>
+        <label style="margin-right: 15px;">
+          <input type="radio" name="viewType" value="resourceTimelineMonth" checked> Month
+        </label>
+        <label style="margin-right: 15px;">
+          <input type="radio" name="viewType" value="resourceTimelineYear"> Year
+        </label>
+      </div>
+      
+      <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #ddd;">
+        <strong style="display: block; margin-bottom: 8px;">Plugin Options:</strong>
+        <label>
+          <input type="checkbox" id="enabled" checked> 
+          <strong>Enable Auto-Hide</strong>
+        </label>
+        <label>
+          Buffer Days: <input type="number" id="bufferDays" value="0" min="0" style="width: 60px">
+        </label>
+        <label>
+          Debounce (ms): <input type="number" id="debounceMs" value="300" min="0" style="width: 80px">
+        </label>
+        <label>
+          <input type="checkbox" id="includeBackground"> Include Background Events
+        </label>
+      </div>
+      
+      <div>
+        <strong style="display: block; margin-bottom: 8px;">Always Visible Resources:</strong>
+        <label>
+          Always Show Resource IDs (comma-separated): 
+          <input type="text" id="alwaysVisible" placeholder="e.g. resource-25,resource-26" style="width: 300px">
+        </label>
+      </div>
+    </div>
+
+    <div class="status" id="status">
+      <strong>Status:</strong> <span id="statusText">Initializing...</span>
+    </div>
+
+    <div id="calendar"></div>
+  </div>
+
+  <!-- Load FullCalendar Scheduler (includes core + resource-timeline) -->
+  <script src='https://cdn.jsdelivr.net/npm/fullcalendar-scheduler@6.1.9/index.global.min.js'></script>
+  
+  <!-- Load our plugin LAST - it depends on FullCalendar and resource-timeline -->
+  <script src='./dist/index.global.min.js'></script>
+  
+  <script>
+    // Verify everything loaded
+    window.addEventListener('load', function() {
+      console.log('FullCalendar:', typeof FullCalendar !== 'undefined' ? 'Loaded' : 'Failed');
+      console.log('FullCalendar.createPlugin:', typeof FullCalendar !== 'undefined' && FullCalendar.createPlugin ? 'Available' : 'Not available');
+      console.log('ResourceAutoHide:', typeof FullCalendarResourceAutoHide !== 'undefined' ? 'Loaded' : 'Failed');
+    });
+  </script>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const calendarEl = document.getElementById('calendar');
+      const statusText = document.getElementById('statusText');
+      
+      // Generate test resources (50 total)
+      const resources = [];
+      for (let i = 1; i <= 50; i++) {
+        let title = `Resource ${i}`;
+        let description = '';
+        
+        if (i <= 10) {
+          description = ' (weekly events + background overlay)';
+        } else if (i <= 20) {
+          description = ' (monthly events in next months)';
+        } else if (i <= 25) {
+          description = ' (yearly events next year)';
+        } else if (i <= 30) {
+          description = ' (past events)';
+        } else if (i === 31) {
+          description = ' (multiple events)';
+        } else if (i <= 40) {
+          description = ' (background events only)';
+        } else {
+          description = ' (no events)';
+        }
+        
+        resources.push({
+          id: 'resource-' + i,
+          title: title + description,
+          extendedProps: {
+            department: i % 5 === 0 ? 'Management' : 'Engineering',
+            testCase: i <= 31 ? 'has-events' : 'no-events'
+          }
+        });
+      }
+      
+      // Add special resources that should always be visible
+      resources.push({
+        id: 'unassigned',
+        title: 'Unassigned',
+        extendedProps: { department: 'General' }
+      });
+      resources.push({
+        id: 'backlog',
+        title: 'Backlog',
+        extendedProps: { department: 'General' }
+      });
+
+      // Generate comprehensive test events spread across different time periods
+      const events = [];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Test Case 1: Resources 1-10 - Events in current month (weekly spread)
+      for (let i = 1; i <= 10; i++) {
+        const startDate = new Date(today);
+        startDate.setDate(today.getDate() + (i * 7)); // Each resource's event starts 7 days apart
+        
+        events.push({
+          id: 'event-weekly-' + i,
+          resourceId: 'resource-' + i,
+          title: `Weekly Event ${i}`,
+          start: startDate,
+          end: new Date(startDate.getTime() + 3 * 24 * 60 * 60 * 1000), // 3 days duration
+          extendedProps: {
+            type: 'Weekly Assignment',
+            testCase: 'current-month-weekly'
+          }
+        });
+      }
+      
+      // Test Case 2: Resources 11-20 - Events in next month (monthly spread)
+      for (let i = 11; i <= 20; i++) {
+        const startDate = new Date(today);
+        startDate.setMonth(today.getMonth() + (i - 10)); // Spread across next 10 months
+        
+        events.push({
+          id: 'event-monthly-' + i,
+          resourceId: 'resource-' + i,
+          title: `Monthly Event ${i}`,
+          start: startDate,
+          end: new Date(startDate.getTime() + 5 * 24 * 60 * 60 * 1000), // 5 days duration
+          extendedProps: {
+            type: 'Monthly Assignment',
+            testCase: 'next-months'
+          }
+        });
+      }
+      
+      // Test Case 3: Resources 21-25 - Events next year (for year view testing)
+      for (let i = 21; i <= 25; i++) {
+        const startDate = new Date(today);
+        startDate.setFullYear(today.getFullYear() + 1);
+        startDate.setMonth((i - 21) * 2); // Spread across months (0, 2, 4, 6, 8)
+        startDate.setDate(1); // Set to first of month for consistency
+        
+        events.push({
+          id: 'event-yearly-' + i,
+          resourceId: 'resource-' + i,
+          title: `Yearly Event ${i}`,
+          start: startDate,
+          end: new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000), // 7 days duration
+          extendedProps: {
+            type: 'Yearly Assignment',
+            testCase: 'next-year'
+          }
+        });
+      }
+      
+      // Test Case 4: Resources 26-30 - Events in past (test backward navigation)
+      for (let i = 26; i <= 30; i++) {
+        const startDate = new Date(today);
+        startDate.setDate(today.getDate() - (i - 25) * 7); // Past weeks
+        
+        events.push({
+          id: 'event-past-' + i,
+          resourceId: 'resource-' + i,
+          title: `Past Event ${i}`,
+          start: startDate,
+          end: new Date(startDate.getTime() + 2 * 24 * 60 * 60 * 1000), // 2 days duration
+          extendedProps: {
+            type: 'Past Assignment',
+            testCase: 'past-weeks'
+          }
+        });
+      }
+      
+      // Test Case 5: Resource 31 - Multiple events (test same resource with multiple events)
+      const multiEventStart1 = new Date(today);
+      multiEventStart1.setDate(today.getDate() + 14);
+      events.push({
+        id: 'event-multi-1',
+        resourceId: 'resource-31',
+        title: 'Multi Event 1',
+        start: multiEventStart1,
+        end: new Date(multiEventStart1.getTime() + 2 * 24 * 60 * 60 * 1000),
+        extendedProps: { type: 'Multi-Event', testCase: 'same-resource-multiple' }
+      });
+      
+      const multiEventStart2 = new Date(today);
+      multiEventStart2.setDate(today.getDate() + 28);
+      events.push({
+        id: 'event-multi-2',
+        resourceId: 'resource-31',
+        title: 'Multi Event 2',
+        start: multiEventStart2,
+        end: new Date(multiEventStart2.getTime() + 2 * 24 * 60 * 60 * 1000),
+        extendedProps: { type: 'Multi-Event', testCase: 'same-resource-multiple' }
+      });
+      
+      // Test Case 6: Background Events - Test includeBackgroundEvents option
+      // Background events for resources that would otherwise be hidden (32-40)
+      for (let i = 32; i <= 40; i++) {
+        const bgStartDate = new Date(today);
+        bgStartDate.setDate(today.getDate() + (i - 31) * 10); // Spread across future dates
+        
+        events.push({
+          id: 'bg-event-' + i,
+          resourceId: 'resource-' + i,
+          title: `Background Block ${i}`,
+          start: bgStartDate,
+          end: new Date(bgStartDate.getTime() + 5 * 24 * 60 * 60 * 1000), // 5 days duration
+          display: 'background', // This makes it a background event
+          backgroundColor: '#ffcccc',
+          borderColor: '#ff9999',
+          extendedProps: {
+            type: 'Background Block',
+            testCase: 'background-events'
+          }
+        });
+      }
+      
+      // Background events that overlay regular events (for resources 1-5)
+      for (let i = 1; i <= 5; i++) {
+        const bgStartDate = new Date(today);
+        bgStartDate.setDate(today.getDate() + (i * 7) + 1); // Overlap with regular events
+        
+        events.push({
+          id: 'bg-overlay-' + i,
+          resourceId: 'resource-' + i,
+          title: `Maintenance Window ${i}`,
+          start: bgStartDate,
+          end: new Date(bgStartDate.getTime() + 1 * 24 * 60 * 60 * 1000), // 1 day duration
+          display: 'background', // Background event
+          backgroundColor: '#ffffcc',
+          borderColor: '#ffcc00',
+          extendedProps: {
+            type: 'Maintenance',
+            testCase: 'background-overlay'
+          }
+        });
+      }
+      
+      // Note: Resources 41-50 have NO events (for testing empty date ranges)
+
+      // Initialize calendar
+      // Check if FullCalendar and plugin loaded correctly
+      if (typeof FullCalendar === 'undefined') {
+        statusText.textContent = 'ERROR: FullCalendar failed to load!';
+        console.error('FullCalendar is not defined');
+        return;
+      }
+      
+      if (typeof FullCalendarResourceAutoHide === 'undefined') {
+        statusText.textContent = 'ERROR: Plugin failed to load! Check console for errors.';
+        console.error('FullCalendarResourceAutoHide is not defined');
+        return;
+      }
+      
+      // The plugin is exported directly from the IIFE
+      const resourceAutoHidePlugin = FullCalendarResourceAutoHide;
+      
+      console.log('FullCalendar available:', typeof FullCalendar !== 'undefined');
+      console.log('Plugin available:', typeof FullCalendarResourceAutoHide !== 'undefined');
+      console.log('Plugin value:', resourceAutoHidePlugin);
+      
+      // With fullcalendar-scheduler, resourceTimeline is included automatically
+      // In global builds, plugins are often registered automatically or passed differently
+      let calendar;
+      try {
+        // Try passing plugin in plugins array
+        const pluginsToUse = [resourceAutoHidePlugin];
+        
+        // Get initial view from radio buttons
+        const initialView = document.querySelector('input[name="viewType"]:checked')?.value || 'resourceTimelineMonth';
+        
+        calendar = new FullCalendar.Calendar(calendarEl, {
+          schedulerLicenseKey: 'GPL-My-Project-Is-Open-Source',
+          plugins: pluginsToUse,
+          initialView: initialView,
+          initialDate: today,
+          resourceAreaWidth: '20%',
+          resources: resources,
+          events: events,
+          resourceAutoHide: {
+            enabled: true,
+            bufferDays: 0,
+            debounceMs: 300,
+            alwaysVisibleResourceIds: ['unassigned', 'backlog'],
+            includeBackgroundEvents: false
+          },
+          datesSet: function(info) {
+            try {
+              const visibleResources = calendar.getResources();
+              const view = calendar.view;
+              statusText.textContent = 
+                `View: ${view?.type || 'unknown'} | ` +
+                `Showing ${visibleResources.length} resources | ` +
+                `Date range: ${info.startStr.substring(0, 10)} to ${info.endStr.substring(0, 10)}`;
+            } catch (e) {
+              console.error('Error in datesSet:', e);
+            }
+          },
+          viewDidMount: function(info) {
+            try {
+              const visibleResources = calendar.getResources();
+              statusText.textContent = 
+                `View: ${info.view.type} | ` +
+                `Showing ${visibleResources.length} resources | ` +
+                `Switched to ${info.view.type} view`;
+            } catch (e) {
+              console.error('Error in viewDidMount:', e);
+            }
+          }
+        });
+
+      calendar.render();
+
+      // Update status initially
+      if (calendar) {
+        try {
+          const visibleResources = calendar.getResources();
+          const view = calendar.view;
+          statusText.textContent = 
+            `Initialized: ${view?.type || 'month'} view | ` +
+            `Showing ${visibleResources.length} resources out of ${resources.length} total | ` +
+            `Navigate dates or switch views to see auto-hide in action!`;
+        } catch (e) {
+          statusText.textContent = `Calendar created but error getting resources: ${e.message}`;
+        }
+      }
+      
+      // View switcher event handler
+      document.querySelectorAll('input[name="viewType"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+          if (this.checked) {
+            calendar.changeView(this.value);
+          }
+        });
+      });
+
+      } catch (error) {
+        console.error('Error creating calendar:', error);
+        statusText.textContent = 'ERROR: ' + error.message;
+        statusText.style.background = '#ffebee';
+        statusText.style.borderLeftColor = '#f44336';
+        return; // Exit early if calendar creation failed
+      }
+
+      // Update plugin options based on controls
+      document.getElementById('enabled').addEventListener('change', function() {
+        calendar.setOption('resourceAutoHide', {
+          ...calendar.getOption('resourceAutoHide'),
+          enabled: this.checked
+        });
+        statusText.textContent = `Auto-hide ${this.checked ? 'enabled' : 'disabled'}`;
+      });
+
+      document.getElementById('bufferDays').addEventListener('input', function() {
+        calendar.setOption('resourceAutoHide', {
+          ...calendar.getOption('resourceAutoHide'),
+          bufferDays: parseInt(this.value) || 0
+        });
+        statusText.textContent = `Buffer days updated to ${this.value}`;
+      });
+
+      document.getElementById('debounceMs').addEventListener('input', function() {
+        calendar.setOption('resourceAutoHide', {
+          ...calendar.getOption('resourceAutoHide'),
+          debounceMs: parseInt(this.value) || 300
+        });
+      });
+
+      document.getElementById('includeBackground').addEventListener('change', function() {
+        calendar.setOption('resourceAutoHide', {
+          ...calendar.getOption('resourceAutoHide'),
+          includeBackgroundEvents: this.checked
+        });
+      });
+
+      document.getElementById('alwaysVisible').addEventListener('input', function() {
+        const ids = this.value.split(',').map(id => id.trim()).filter(id => id);
+        calendar.setOption('resourceAutoHide', {
+          ...calendar.getOption('resourceAutoHide'),
+          alwaysVisibleResourceIds: ids.length > 0 ? ids : ['unassigned', 'backlog']
+        });
+      });
+
+      // Test instructions
+      console.log('=== Example Usage Instructions ===');
+      console.log('');
+      console.log('VIEW CHANGES:');
+      console.log('1. Switch between Day, Week, Month, and Year views');
+      console.log('   - Day view: Test single-day resource filtering');
+      console.log('   - Week view: Test week-range filtering');
+      console.log('   - Month view: Test month-range filtering');
+      console.log('   - Year view: Test year-range filtering');
+      console.log('');
+      console.log('DATE NAVIGATION:');
+      console.log('2. Current month: Should show resources 1-10 (weekly events)');
+      console.log('3. Navigate to next month: Should show resources 11-20 (monthly events)');
+      console.log('4. Navigate to next year: Should show resources 21-25 (yearly events)');
+      console.log('5. Navigate to past: Should show resources 26-30 (past events)');
+      console.log('6. Navigate to dates without events: Should show only "Unassigned" and "Backlog"');
+      console.log('');
+      console.log('BACKGROUND EVENTS TESTING:');
+      console.log('7. Resources 32-40 have ONLY background events:');
+      console.log('   - With "Include Background Events" UNCHECKED: Should be HIDDEN');
+      console.log('   - With "Include Background Events" CHECKED: Should be VISIBLE when in date range');
+      console.log('8. Resources 1-5 have regular events + background overlay:');
+      console.log('   - Should always show (regular events make them visible)');
+      console.log('   - Background events are just visual overlays');
+      console.log('');
+      console.log('PLUGIN OPTIONS:');
+      console.log('9. Toggle "Enable Auto-Hide" to see all resources when disabled');
+      console.log('10. Change buffer days to see resources with nearby events');
+      console.log('11. Toggle "Include Background Events" to test background event filtering');
+      console.log('12. Add resource IDs to "Always Show" field to keep them visible');
+      console.log('');
+      console.log('EDGE CASES:');
+      console.log('13. Resource 31 has multiple events - verify it shows when either event is visible');
+      console.log('14. Resources 41-50 have no events - should always be hidden (except if in always-visible list)');
+      console.log('15. Test rapid view switching to ensure no performance issues');
+      console.log('');
+      console.log('TEST CASES SUMMARY:');
+      console.log('- Resources 1-10: Weekly events in current month (+ background overlay for 1-5)');
+      console.log('- Resources 11-20: Monthly events in next months');
+      console.log('- Resources 21-25: Yearly events next year');
+      console.log('- Resources 26-30: Past events');
+      console.log('- Resource 31: Multiple events (same resource)');
+      console.log('- Resources 32-40: Background events ONLY (test includeBackgroundEvents option)');
+      console.log('- Resources 41-50: No events (should be hidden)');
+      console.log('- Unassigned & Backlog: Always visible');
+    });
+  </script>
+</body>
+</html>

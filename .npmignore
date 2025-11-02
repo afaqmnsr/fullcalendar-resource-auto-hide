@@ -1,0 +1,17 @@
+node_modules/
+src/
+*.log
+.DS_Store
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+example.html
+tsconfig.json
+rollup.config.js
+CONTRIBUTING.md
+PUBLISHING.md
+TESTING.md
+package-lock.json
+.gitignore
