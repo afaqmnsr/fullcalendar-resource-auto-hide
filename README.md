@@ -164,5 +164,5 @@ Contributions are welcome! Open an issue or submit a pull request on [GitHub](ht
 ## Related Links
 
 - [FullCalendar Documentation](https://fullcalendar.io/docs)
-- [FullCalendar Resource Timeline Plugin](https://fullcalendar.io/docs/resource-timeline)
+- [FullCalendar Timeline View](https://fullcalendar.io/docs/timeline-view)
 - [Report an Issue](https://github.com/afaqmnsr/fullcalendar-resource-auto-hide/issues)
