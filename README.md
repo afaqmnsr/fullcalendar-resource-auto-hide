@@ -116,7 +116,7 @@ Only consider specific event types when determining visibility:
 ```javascript
 resourceAutoHide={{
   eventFilter: (event) => {
-    return event.extendedProps?.type === 'Work Assignment';
+    return event.extendedProps?.type === 'Booking';
   }
 }}
 ```
